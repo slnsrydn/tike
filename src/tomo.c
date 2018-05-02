@@ -1,5 +1,20 @@
 #include "tomo.h"
 
+float
+euclidian(
+    const float *a,
+    const float *b,
+    const float radius)
+{
+    float r1, r2, theta1, theta2;
+    r1 = sqrt(radius*radius + a[1]*a[1]);
+    r2 = sqrt(radius*radius + b[1]*b[1]);
+    theta1 = a[0] + atan2(a[1], radius);
+    theta2 = b[0] + atan2(b[1], radius);
+    return sqrt(r1*r1 + r2*r2 - 2*r1*r2*cos(theta2-theta1)
+                + (a[2]-b[2])*(a[2]-b[2]));
+};
+
 void
 art(
     const float *data,

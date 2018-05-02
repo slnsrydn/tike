@@ -13,6 +13,16 @@
 #include <assert.h>
 #include "string.h"
 
+/**
+  Return the euclidian (xyz) distance between two points defined in the Probe
+  reference frame (theta, h, v). Use the given radius in the conversion.
+*/
+float
+euclidian(
+    const float *a,
+    const float *b,
+    const float radius);
+
 void
 art(
     const float *data,
