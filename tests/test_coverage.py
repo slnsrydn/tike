@@ -51,7 +51,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import numpy as np
 from numpy.testing import assert_allclose, assert_raises, assert_equal
-from tike.scan import *
+from tike.probe import *
 import matplotlib.pyplot as plt
 
 __author__ = "Daniel Ching"
@@ -93,9 +93,11 @@ def test_probe_smaller_than_default_line_size():
 
 
 def test_discrete_trajectory():
-    def stationary(t):
+    def stationary(t, slope=False):
         """Probe is stationary at location h = 8, v = 8"""
-        return [0, 8, 8]
+        if slope:
+            return [0*t, 0*t, 0*t]
+        return [0*t, 8 + 0*t, 8 + 0*t]
 
     answer = discrete_trajectory(stationary, tmin=0, tmax=0.65, dx=0.1, dt=1)
     truth = ([[0, 8, 8]], [0.65], [0])
@@ -142,38 +144,48 @@ def init_coverage():
     """Return Probe of width 1/16"""
     p = Probe(width=1/16, aspect=1)
     region = np.array([[-8/16, 8/16], [-8/16, 8/16], [-8/16, 8/16]])
-    # FIXME: Tests fail if region is adjusted to region below
-    # region = np.array([[-8/16, 8/16], [-8/16, 3/16], [-4/16, 8/16]])
     pixel_size = 1/16
     return p, region, pixel_size
 
 
-def stationary(t):
+def stationary(t, slope=False):
     """Probe is stationary at location h = 2 + 1/32, v = 1/32"""
-    return [0*t, 2/16 + 1/32 + 0*t, 1/32 + 0*t]
+    if slope:
+        return [0*t, 0*t, 0*t]
+    else:
+        return [0*t, 2/16 + 1/32 + 0*t, 1/32 + 0*t]
 
 
-def horizontal_move(t, h_speed=-2/320):
+def horizontal_move(t, h_speed=-2/320, slope=False):
     """Probe moves horizontally at h_speed [cm/s]"""
-    return [0*t, 1/32 + h_speed*t, 2/16 + 1/32 + 0*t]
+    if slope:
+        return [0*t, h_speed + 0*t, 0*t]
+    else:
+        return [0*t, 1/32 + h_speed*t, 2/16 + 1/32 + 0*t]
 
 
-def vertical_move(t, v_speed=2/320):
+def vertical_move(t, v_speed=2/320, slope=False):
     """Probe moves vertically at v_speed [cm/s]"""
-    return [0*t, 1/32 + 0*t, 1/32 + v_speed*t]
+    if slope:
+        return [0*t, 0*t, v_speed + 0*t]
+    else:
+        return [0*t, 1/32 + 0*t, 1/32 + v_speed*t]
 
 
-def theta_move(t, Hz=1):
+def theta_move(t, Hz=1, slope=False):
     """Probe rotates at rate Hz [2 Pi radians / s]"""
-    theta = 2 * np.pi * Hz * t
-    return [theta, 0*t, 0*t]
+    if slope:
+        return [2 * np.pi * Hz + 0*t, 0*t, 0*t]
+    else:
+        theta = 2 * np.pi * Hz * t
+        return [theta, 0*t, 0*t]
 
 
 def test_stationary_coverage():
     """A beam of magnitude 10 at (:, 10, 8)."""
     p, region, pixel_size = init_coverage()
     cov_map = p.coverage(trajectory=stationary, region=region,
-                         pixel_size=pixel_size, tmin=0, tmax=10, dt=1)
+                         pixel_size=pixel_size, tmin=0, tmax=10, dt=10)
     show_coverage(cov_map)
     key = cov_map[:, 8, :]
     truth = np.zeros([16, 16])
@@ -188,7 +200,7 @@ def test_stationary_coverage_crop():
     p, region, pixel_size = init_coverage()
     region = np.array([[-8/16, 8/16], [-0/16, 8/16], [-0/16, 4/16]])
     cov_map = p.coverage(trajectory=stationary, region=region,
-                         pixel_size=pixel_size, tmin=0, tmax=10, dt=1)
+                         pixel_size=pixel_size, tmin=0, tmax=10, dt=10)
     show_coverage(cov_map)
     key = cov_map[:, 1, :]
     truth = np.zeros([16, 4])
@@ -203,7 +215,7 @@ def test_horizontal_coverage():
     # edges even out as the time step approaches zero.
     p, region, pixel_size = init_coverage()
     cov_map = p.coverage(trajectory=horizontal_move, region=region,
-                         pixel_size=pixel_size, tmin=0, tmax=40, dt=1)
+                         pixel_size=pixel_size, tmin=0, tmax=40, dt=10)
     show_coverage(cov_map)
     key = cov_map[:, 10, :]
     truth = np.zeros([16, 16])
@@ -221,7 +233,7 @@ def test_horizontal_coverage():
 def test_vertical_coverage():
     p, region, pixel_size = init_coverage()
     cov_map = p.coverage(trajectory=vertical_move, region=region,
-                         pixel_size=pixel_size, tmin=0, tmax=40, dt=1)
+                         pixel_size=pixel_size, tmin=0, tmax=40, dt=10)
     show_coverage(cov_map)
     key = cov_map[:, 4, :]
     truth = np.zeros([16, 16])
