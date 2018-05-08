@@ -210,7 +210,7 @@ class Probe(object):
                 th_offset = np.array([offset[0], offset[1], 0])
 
                 def line_trajectory(t):
-                    return trajectory(t) + th_offset
+                    return np.asarray(trajectory(t)).T + th_offset
 
                 position, dwell, none = discrete_trajectory(
                                             trajectory=line_trajectory,
@@ -547,6 +547,13 @@ def discrete_trajectory(trajectory, tmin, tmax, dx, dt, max_iter=16):
     another point is generated recursively between the previous two.
     """
     position, time, dwell, nextxt = list(), list(), list(), list()
+    # # Precalculate points along trajectory
+    t = np.arange(tmin, tmax, dt)
+    thv = np.array(trajectory(t))
+    for i in range(len(t)):
+        nextxt.append([thv[i].tolist(), t[i]])
+    max_iter += len(nextxt)
+    # Fill in gaps
     t, tnext = tmin, min(tmin + dt, tmax)
     x = trajectory(t)
     while t < tmax:
