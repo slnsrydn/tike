@@ -11,7 +11,15 @@ tomoc = Extension(
     extra_link_args=['-lgomp'],
     sources=['src/tomo.c', 'src/siddon.c'])
 
-ext_mods = [tomoc]
+raytracec = Extension(
+    name='tike.libraytrace',
+    undef_macros=['NDEBUG'],
+    extra_compile_args=['-c', '-Wall', '-std=c11', '-pedantic',
+                        '-fopenmp', '-fpic'],
+    extra_link_args=['-lgomp'],
+    sources=['src/raytrace.c'])
+
+ext_mods = [tomoc, raytracec]
 
 # Remove external C code for RTD builds
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'

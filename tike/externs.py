@@ -65,13 +65,14 @@ __all__ = ['c_shared_lib',
 logger = logging.getLogger(__name__)
 
 # Import shared library.
+LIBRAYTRACE = ctypes.CDLL('/home/beams0/B242827/Documents/tike/tike/libraytrace.cpython-35m-x86_64-linux-gnu.so')
 LIBTIKE = ctypes.CDLL('/home/beams0/B242827/Documents/tike/tike/libtike.cpython-35m-x86_64-linux-gnu.so')
 
 
 def c_coverage(ozmin, oxmin, oymin, zsize, xsize, ysize, oz, ox, oy, ot,
                theta, h, v, w, dsize, cov):
-    LIBTIKE.coverage.restype = utils.as_c_void_p()
-    return LIBTIKE.coverage(
+    LIBRAYTRACE.coverage.restype = utils.as_c_void_p()
+    return LIBRAYTRACE.coverage(
             utils.as_c_float(ozmin),
             utils.as_c_float(oxmin),
             utils.as_c_float(oymin),
