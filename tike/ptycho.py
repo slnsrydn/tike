@@ -367,40 +367,44 @@ def grad(data=None, data_min=None,
     # Compute probe inverse
     # TODO: Update the probe too
     probe_inverse = np.conj(probe)
-    wavefronts = np.empty([h.size, probe.shape[0], probe.shape[1]],
+    wavefronts = np.empty([probe.shape[0], probe.shape[1]],
                           dtype='complex')
     for i in range(niter):
         upd_psi = np.zeros(psi.shape, dtype='complex')
         # combine all wavefronts into one array
         for m in range(h.size):
-            wavefronts[m] = psi[theta[m],
+            wavefronts = psi[
                                 h[m]:h[m] + probe.shape[0],
                                 v[m]:v[m] + probe.shape[1]]
-        # Compute near-plane wavefront
-        nearplane = probe * wavefronts
-        # Pad before FFT
-        nearplane_pad = np.pad(nearplane,
-                               ((0, 0), (npadx, npadx), (npady, npady)),
-                               mode='constant')
-        # Go far-plane
-        farplane = np.fft.fft2(nearplane_pad)
-        # Replace the amplitude with the measured amplitude.
-        farplane = np.sqrt(data) * np.exp(1j * np.angle(farplane))
-        # Back to near-plane.
-        new_nearplane = np.fft.ifft2(farplane)[...,
-                                               npadx:npadx+probe.shape[0],
-                                               npady:npady+probe.shape[1]]
-        # Update measurement patch.
-        upd_m = probe_inverse * (new_nearplane - nearplane)
-        # Combine measurement with other updates
-        for m in range(h.size):
-            upd_psi[theta[m],
+            # Compute near-plane wavefront
+            nearplane = probe * wavefronts
+            # Pad before FFT
+            nearplane_pad = np.pad(nearplane,
+                                   ((npadx, npadx), (npady, npady)),
+                                   mode='constant')
+            # Go far-plane
+            farplane = np.fft.fft2(nearplane_pad)
+            # Replace the amplitude with the measured amplitude.
+            farplane = np.sqrt(data[m]) * np.exp(1j * np.angle(farplane))
+            # Back to near-plane.
+            new_nearplane = np.fft.ifft2(farplane)[
+                                                   npadx:npadx+probe.shape[0],
+                                                   npady:npady+probe.shape[1]]
+            # Update measurement patch.
+            upd_m = probe_inverse * (new_nearplane - nearplane)
+            # Combine measurement with other updates
+            upd_psi[
                     h[m]:h[m]+probe.shape[0],
-                    v[m]:v[m]+probe.shape[1]] += upd_m[m]
+                    v[m]:v[m]+probe.shape[1]] += upd_m
         # Update psi
         psi = ((1 - gamma * rho) * psi
                + gamma * rho * (reg - lamda / rho)
                + (gamma / 2) * upd_psi)
+
+        # Lag_grad = 1 / 2 * upd_psi + rho * (psi - reg + lamd / rho)
+        # if (np.sqrt(np.sum(np.square(np.abs(Lag_grad))), axis=(-1, -2))
+        #         < epsilon):
+        #     break
 
     return psi
 
