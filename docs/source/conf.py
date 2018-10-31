@@ -19,6 +19,7 @@
 
 import sys
 import os
+from pkg_resources import DistributionNotFound
 from pkg_resources import get_distribution
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -43,7 +44,9 @@ extensions = ['sphinx.ext.autodoc',
               'sphinx.ext.coverage',
               'sphinx.ext.autosummary',
               'sphinx.ext.imgmath',
-              'sphinx.ext.viewcode']
+              'sphinx.ext.viewcode',
+              'sphinxcontrib.bibtex',
+              ]
 
 # Napoleon settings.
 napoleon_google_docstring = True
@@ -196,7 +199,14 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
-autodoc_mock_imports = ['numpy', 'matplotlib']
+autodoc_mock_imports = [
+    'matplotlib',
+    'matplotlib.pyplot',
+    'numpy',
+    'scipy',
+    'scipy.ndimage.interpolate',
+    'tomopy',
+]
 
 
 class Mock(object):
