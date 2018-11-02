@@ -182,24 +182,32 @@ def reconstruct(obj=None, obj_min=None,
     -------
     obj : (Z, X, Y, P) :py:class:`numpy.array` float
         The updated obj grid.
+        
+    convx : float
+        The convergence of the object
 
     """
-    Lr = tomopy.recon(tomo=line_integrals.real,
+    convx = list()
+    recon0 = obj
+    for l in range(niter):     
+        Lr = tomopy.recon(tomo=line_integrals.real,
                       theta=theta,
                       algorithm=algorithm,
-                      init_recon=obj.real,
-                      num_iter=niter, **kwargs,
+                      init_recon=recon0.real,
+                      num_iter=1, **kwargs,
                       )
-    Li = tomopy.recon(tomo=line_integrals.imag,
+        Li = tomopy.recon(tomo=line_integrals.imag,
                       theta=theta,
                       algorithm=algorithm,
-                      init_recon=obj.imag,
-                      num_iter=niter, **kwargs,
+                      init_recon=recon0.imag,
+                      num_iter=1, **kwargs,
                       )
-    recon = np.empty(Lr.shape, dtype=complex)
-    recon.real = Lr
-    recon.imag = Li
-    return recon
+        recon = np.empty(Lr.shape, dtype=complex)
+        recon.real = Lr
+        recon.imag = Li
+        convx.append(np.sqrt(np.sum(np.power(np.abs(recon - recon0), 2))))
+        recon0 = recon
+    return recon, convx
     # obj, obj_min, probe, theta, v, h \
     #     = _tomo_interface(obj, obj_min, probe, theta, v, h)
     # assert niter >= 0, "Number of iterations should be >= 0"

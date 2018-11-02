@@ -361,6 +361,7 @@ def grad(data=None, data_min=None,
     # TODO: Update the probe too
     probe_inverse = np.conj(probe)
     wavefront_shape = [psi.shape[0] * h.size, probe.shape[0], probe.shape[1]]
+    convpsi = np.zeros(niter, dtype='float32')
     for i in range(niter):
         # combine all wavefronts into one array
         wavefronts = uncombine_grids(grids_shape=wavefront_shape, v=v, h=h,
@@ -380,15 +381,20 @@ def grad(data=None, data_min=None,
                                                npadv:npadv+probe.shape[0],
                                                npadh:npadh+probe.shape[1]]
         # Update measurement patch.
-        upd_m = probe_inverse * (new_nearplane - nearplane)
+        upd_m = probe_inverse * (nearplane - new_nearplane)
         # Combine measurement with other updates
         upd_psi = combine_grids(grids=upd_m, v=v, h=h,
                                 combined_shape=psi.shape, combined_min=psi_min)
         # Update psi
-        psi = ((1 - gamma * rho) * psi
+        new_psi = ((1 - gamma * rho) * psi
                + gamma * rho * (reg - lamda / rho)
-               + (gamma / 2) * upd_psi)
-    return psi
+               - (gamma / 2) * upd_psi)
+        convpsi[i] = np.sqrt(np.sum(np.power(np.abs(new_psi - psi), 2)))
+        psi = new_psi.copy()       
+        
+    dualres3 = np.sqrt(np.sum(np.power(np.abs(0.5 * upd_psi + lamda), 2)))
+        
+    return new_psi, convpsi, dualres3
 
 
 def exitwave(probe, psi, v, h, psi_min=None):
@@ -442,18 +448,18 @@ def reconstruct(data=None, data_min=None,
                           probe, theta, v, h,
                           psi, psi_min, **kwargs)
     # Send data to c function
-    logger.info("{} on {:,d} - {:,d} by {:,d} grids for {:,d} "
-                "iterations".format(algorithm, *data.shape, niter))
+#    logger.info("{} on {:,d} - {:,d} by {:,d} grids for {:,d} "
+#                "iterations".format(algorithm, *data.shape, niter))
     # Add new algorithms here
     # TODO: The size of this function may be reduced further if all recon clibs
     #   have a standard interface. Perhaps pass unique params to a generic
     #   struct or array.
     if algorithm is "grad":
-        new_psi = grad(data=data, data_min=data_min,
+        new_psi, convpsi, dualres3 = grad(data=data, data_min=data_min,
                        probe=probe, theta=theta, v=v, h=h,
                        psi=psi, psi_min=psi_min,
                        niter=niter, **kwargs)
     else:
         raise ValueError("The {} algorithm is not an available.".format(
             algorithm))
-    return new_psi
+    return new_psi, convpsi, dualres3
