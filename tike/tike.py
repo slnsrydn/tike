@@ -137,19 +137,21 @@ def admm(obj=None, voxelsize=1.0,
     convallx_admm = list()
     for i in range(niter):
         # Ptychography.
-        psi[view], convpsi, dualres3 = tike.ptycho.reconstruct(data=data[view],
-                                                probe=probe,
-                                                v=v[view], h=h[view],
-                                                psi=psi[view],
-                                                algorithm='grad',
-                                                niter=1, rho=rho, gamma=gamma,
-                                                reg=hobj[view],
-                                                lamda=lamda[view], **kwargs)
+        for view in range(len(psi)):
+            psi[view], convpsi, dualres3 = tike.ptycho.reconstruct(data=data[view],
+                                                    probe=probe,
+                                                    v=v[view], h=h[view],
+                                                    psi=psi[view],
+                                                    algorithm='grad',
+                                                    niter=1, rho=rho, gamma=gamma,
+                                                    reg=hobj[view],
+                                                    lamda=lamda[view], **kwargs)
         dxchange.write_tiff(np.real(psi[0]).astype('float32'), folder + '/psi-amplitude/psi-amplitude')
         dxchange.write_tiff(np.imag(psi[0]).astype('float32'), folder + '/psi-phase/psi-phase')
         dxchange.write_tiff(np.abs((psi + lamda/rho)[0]).astype('float32'), folder + '/psilamd-amplitude/psilamd-amplitude')
         dxchange.write_tiff(np.angle((psi + lamda/rho)[0]).astype('float32'), folder + '/psilamd-phase/psilamd-phase')
         cp[i] = np.sqrt(np.sum(np.power(np.abs(hobj-psi), 2)))
+        np.save("psi-vals/psi{:03d}.npy".format(i), psi)
         convpsi_admm.append(convpsi)
         dualres3_admm.append(dualres3)
         # Tomography.
@@ -157,7 +159,7 @@ def admm(obj=None, voxelsize=1.0,
         new_x, convx = tike.tomo.reconstruct(obj=x,
                                   theta=theta,
                                   line_integrals=phi,
-                                  algorithm='grad', reg_par=-1,
+                                  algorithm='grad', reg_par=0.25,
                                   niter=1, **kwargs)
         np.save("x-vals/x{:03d}.npy".format(i), new_x)
         co[i] = np.sqrt(np.sum(np.power(np.abs(x- new_x), 2)))
@@ -191,41 +193,42 @@ def admm(obj=None, voxelsize=1.0,
         dualres2_admm.append(np.sqrt(np.sum(np.power(np.abs(dualres2), 2))))
         x = new_x.copy()
         hobj = new_hobj.copy()
-        print (i, cp[i], co[i], cl[i])
+        print (i, cp[i], co[i], cl[i], dualres1, dualres3)
         
-    np.save('res_admmPR1T1theta360prb6rho1gamma01.npy', res_admm)
-    np.save('dualres_admmPR1T1theta360prb6rho1gamma01.npy', dualres1_admm)
-    np.save('dualres_admmPR1T1theta360prb6rho1gamma01.npy', dualres3_admm)
-    np.save('convallx_admmPR1T1theta360prb6rho1gamma01.npy', convallx_admm)
-    np.save('convallpsi_admmPR1T1theta360prb6rho1gamma01.npy', convpsi_admm)
+    np.save('res_admmPR1T1theta360prb6rho1gamma025.npy', res_admm)
+    np.save('dualres1_admmPR1T1theta360prb6rho1gamma025.npy', dualres1_admm)
+    np.save('dualres2_admmPR1T1theta360prb6rho1gamma025.npy', dualres2_admm)
+    np.save('dualres3_admmPR1T1theta360prb6rho1gamma025.npy', dualres3_admm)
+    np.save('convallx_admmPR1T1theta360prb6rho1gamma025.npy', convallx_admm)
+    np.save('convallpsi_admmPR1T1theta360prb6rho1gamma025.npy', convpsi_admm)
     
     plt.figure()
     plt.semilogy(res_admm)
     plt.xlabel('ADMM iter')
     plt.ylabel('residual')
-    plt.savefig('res_admmPR1T1theta360prb6rho1gamma01.png')
+    plt.savefig('res_admmPR1T1theta360prb6rho1gamma025.png')
 
     plt.figure()
     plt.semilogy(dualres1_admm)
     plt.xlabel('ADMM iter')
     plt.ylabel('dual residual')
-    plt.savefig('dualres_admmPR1T1theta360prb6rho1gamma01.png')
+    plt.savefig('dualres1_admmPR1T1theta360prb6rho1gamma025.png')
     
     plt.figure()
     plt.semilogy(dualres2_admm)
     plt.xlabel('ADMM iter')
     plt.ylabel('dual residual')
-    plt.savefig('dualres_admmPR1T1theta360prb6rho1gamma01.png')    
+    plt.savefig('dualres2_admmPR1T1theta360prb6rho1gamma025.png')    
     
     plt.figure()
     plt.semilogy(dualres3_admm)
     plt.xlabel('ADMM iter')
     plt.ylabel('dual residual')
-    plt.savefig('dualres_admmPR1T1theta360prb6rho1gamma01.png')
+    plt.savefig('dualres3_admmPR1T1theta360prb6rho1gamma025.png')
     
     plt.figure()
     plt.semilogy(convallx_admm)
     plt.xlabel('SD and ADMM iter')
     plt.ylabel('Error of x')
-    plt.savefig('convallx_admmPR1T1theta360prb6rho1gamma01.png')
+    plt.savefig('convallx_admmPR1T1theta360prb6rho1gamma025.png')
     return x
