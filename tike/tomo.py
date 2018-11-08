@@ -161,7 +161,7 @@ def _tomo_interface(obj, obj_corner,
 def reconstruct(obj=None,
                 probe=None, theta=None, v=None, h=None,
                 line_integrals=None,
-                algorithm=None, niter=0, **kwargs):
+                algorithm=None, titer=0, **kwargs):
     """Reconstruct the `obj` using the given `algorithm`.
 
     Parameters
@@ -189,7 +189,7 @@ def reconstruct(obj=None,
     """
     convx = list()
     recon0 = obj
-    for l in range(niter):     
+    for l in range(titer):     
         Lr = tomopy.recon(tomo=line_integrals.real,
                       theta=theta,
                       algorithm=algorithm,

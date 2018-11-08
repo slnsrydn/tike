@@ -319,7 +319,7 @@ def uncombine_grids(grids_shape, v, h,
 def grad(data,
          probe, v, h,
          psi, psi_corner,
-         reg=(1+0j), niter=1, rho=0, gamma=0.25, lamda=0j, epsilon=1e-8,
+         reg=(1+0j), priter=1, rho=0, gamma=0.25, lamda=0j, epsilon=1e-8,
          **kwargs):
     """Use gradient descent to estimate `psi`.
 
@@ -348,8 +348,8 @@ def grad(data,
     # TODO: Update the probe too
     probe_inverse = np.conj(probe)
     wavefront_shape = [h.size, probe.shape[0], probe.shape[1]]
-    convpsi = np.zeros(niter, dtype='float32')
-    for i in range(niter):
+    convpsi = np.zeros(priter, dtype='float32')
+    for i in range(priter):
         # combine all wavefronts into one array
         wavefronts = uncombine_grids(grids_shape=wavefront_shape, v=v, h=h,
                                      combined=psi, combined_corner=psi_corner)
@@ -409,7 +409,7 @@ def simulate(data_shape,
 def reconstruct(data=None,
                 probe=None, v=None, h=None,
                 psi=None, psi_corner=None,
-                algorithm=None, niter=1, **kwargs):
+                algorithm=None, priter=1, **kwargs):
     """Reconstruct the `psi` and `probe` using the given `algorithm`.
 
     Parameters
@@ -438,7 +438,7 @@ def reconstruct(data=None,
     # Send data to c function
 #    logger.info("{} on {:,d} - {:,d} by {:,d} grids for {:,d} "
 #                "iterations".format(algorithm,
-#                                    len(data), *data.shape[1:], niter))
+#                                    len(data), *data.shape[1:], priter))
     # Add new algorithms here
     # TODO: The size of this function may be reduced further if all recon clibs
     #   have a standard interface. Perhaps pass unique params to a generic
@@ -447,7 +447,7 @@ def reconstruct(data=None,
         new_psi, convpsi, dualres3 = grad(data=data,
                        probe=probe, v=v, h=h,
                        psi=psi, psi_corner=psi_corner,
-                       niter=niter, **kwargs
+                       priter=priter, **kwargs
                        )
     else:
         raise ValueError("The {} algorithm is not an available.".format(
