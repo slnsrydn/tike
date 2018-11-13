@@ -128,7 +128,7 @@ def admm(obj=None, voxelsize=1.0,
     cp = np.zeros((niter,))
     cl = np.zeros((niter,))
     co = np.zeros((niter,))
-    
+    flag = 1
     resmeanZ_admm = list()
     dualres1meanZ_admm = list()
     dualres1stdZ_admm = list()
@@ -180,7 +180,7 @@ def admm(obj=None, voxelsize=1.0,
         dxchange.write_tiff(new_x.real[obj.shape[0] // 2 - 1].astype('float32'), folder + '/delta/delta')
         dxchange.write_tiff(new_x.imag.astype('float32'), folder + '/beta-full/beta')
         dxchange.write_tiff(new_x.real.astype('float32'), folder + '/delta-full/delta')
-    
+        
         # Lambda update.
         line_integrals = tike.tomo.forward(obj=new_x, theta=theta) * voxelsize
         np.save("line_int-vals/line_integrals{:03d}.npy".format(i), line_integrals)
@@ -205,6 +205,11 @@ def admm(obj=None, voxelsize=1.0,
 #            dualres2 += -gradhobj * new_lamda[m].reshape([*new_lamda[m].shape, 1]) 
            
         dualres2_admm.append(np.sqrt(np.sum(np.power(np.abs(dualres2), 2))))
+        if resmeanZ_admm[i] < 3e-3 and dualres1meanZ_admm[i] < 5e-3 and dualres2_admm[i] < 5e-3 and dualres3meanZ_admm[i] < 5e-3 and flag == 1:
+            dxchange.write_tiff(new_x.imag[obj.shape[0] // 2 - 1].astype('float32'), folder + '/beta/beta_conv_admmprev_3e3')
+            dxchange.write_tiff(new_x.real[obj.shape[0] // 2 - 1].astype('float32'), folder + '/delta/delta_conv_admmprev_3e3')
+            flag = 0
+            
         x = new_x.copy()
         hobj = new_hobj.copy()
         print (i, cp[i], co[i], cl[i], resmeanZ_admm[i], dualres1meanZ_admm[i], dualres2_admm[i], dualres3meanZ_admm[i])
