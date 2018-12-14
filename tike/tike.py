@@ -126,6 +126,7 @@ def admm(
     T = theta.size
     x = obj
     psi = np.ones([T, Z, Y], dtype=obj.dtype)
+    upd_psi = np.ones([T, Z, Y], dtype=obj.dtype)
     hobj = np.ones_like(psi)
     lamda = np.zeros_like(psi)
     cp = np.zeros((niter,))
@@ -147,7 +148,7 @@ def admm(
     for i in range(niter):
         # Ptychography.
         for view in range(len(psi)):
-            psi[view], convpsi[view], dualres3[view] = tike.ptycho.reconstruct(data=data[view],
+            psi[view], convpsi[view], upd_psi[view] = tike.ptycho.reconstruct(data=data[view],
                                                     probe=probe,
                                                     v=v[view], h=h[view],
                                                     psi=psi[view],
@@ -167,14 +168,13 @@ def admm(
         for n in range(len(convpsi[1,:])):
             convpsimeanZ_admm.append(np.mean(convpsi[:,n]))
             convpsistdZ_admm.append(np.std(convpsi[:,n]))
-        dualres3meanZ_admm.append(np.mean(dualres3))
-        dualres3stdZ_admm.append(np.std(dualres3))
+
         # Tomography.
         phi = -1j / wavenumber(energy) * np.log(psi + lamda / rho) / voxelsize
         new_x, convx = tike.tomo.reconstruct(obj=x,
                                   theta=theta,
                                   line_integrals=phi,
-                                  algorithm='grad', reg_par=0.25,
+                                  algorithm='grad', reg_par=-1,
                                   titer=titer, **kwargs)
         np.save("x-vals/x{:03d}.npy".format(i), new_x)
         co[i] = np.sqrt(np.sum(np.power(np.abs(x- new_x), 2)))
@@ -198,6 +198,9 @@ def admm(
         res = np.sqrt(np.sum(np.power(np.abs(np.mean(psi - new_hobj, axis = 0)), 2)))
         resmeanZ_admm.append(res)
         cl[i] = np.sqrt(np.sum(np.power(np.abs(lamda-new_lamda), 2)))
+        dualres3 = np.sqrt(np.sum(np.power(np.abs(0.5 * upd_psi + new_lamda), 2)))
+        dualres3meanZ_admm.append(np.mean(dualres3))
+        dualres3stdZ_admm.append(np.std(dualres3))
         lamda = new_lamda.copy()      
         
         dualres2 = rho * tomopy.recon(line_integrals / voxelsize - phi , theta, algorithm="fbp") * voxelsize

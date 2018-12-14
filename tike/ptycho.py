@@ -82,6 +82,8 @@ import numpy as np
 import logging
 import scipy.ndimage.interpolation as sni
 
+import matplotlib.pyplot as plt
+
 __author__ = "Doga Gursoy, Daniel Ching"
 __copyright__ = "Copyright (c) 2018, UChicago Argonne, LLC."
 __docformat__ = 'restructuredtext en'
@@ -319,6 +321,102 @@ def uncombine_grids(
                              )[1:-1, 1:-1, ...]
     return grids.view(complex)[..., 0]
 
+def gradlagrangian(psi, data, probe, npadv, npadh, v, h, reg, lamda, rho,psi_corner):
+    probe_inverse = np.conj(probe) / np.max(np.square(np.abs(np.conj(probe))))
+    wavefront_shape = [h.size, probe.shape[0], probe.shape[1]]
+    # combine all wavefronts into one array
+    wavefronts = uncombine_grids(grids_shape=wavefront_shape, v=v, h=h,
+                                 combined=psi, combined_corner=psi_corner)
+    # Compute near-plane wavefront
+    nearplane = probe * wavefronts
+    # Pad before FFT
+    nearplane_pad = fast_pad(nearplane, npadv, npadh)
+    # Go far-plane
+    farplane = np.fft.fft2(nearplane_pad)
+    # Replace the amplitude with the measured amplitude.
+    farplane = (np.sqrt(data) * (farplane.real + 1j * farplane.imag)
+                / np.sqrt(farplane.imag * farplane.imag
+                          + farplane.real * farplane.real))
+    # Back to near-plane.
+    new_nearplane = np.fft.ifft2(farplane)[...,
+                                           npadv:npadv+probe.shape[0],
+                                           npadh:npadh+probe.shape[1]]
+    # Update measurement patch.
+    upd_m = probe_inverse * (nearplane - new_nearplane)
+    # Combine measurement with other updates
+    upd_psi = combine_grids(grids=upd_m, v=v, h=h,
+                            combined_shape=psi.shape,
+                            combined_corner=psi_corner)
+    gradnext = (0.5 * upd_psi + rho * psi - rho * reg + lamda).copy()    
+    return gradnext
+
+def lagrangian(psi, data, probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner):
+    wavefront_shape = [h.size, probe.shape[0], probe.shape[1]]
+    # combine all wavefronts into one array
+    wavefronts = uncombine_grids(grids_shape=wavefront_shape, v=v, h=h,
+                                 combined=psi, combined_corner=psi_corner)
+    # Compute near-plane wavefront
+    nearplane = probe * wavefronts
+    # Pad before FFT
+    nearplane_pad = fast_pad(nearplane, npadv, npadh)
+    # Go far-plane
+    farplane = np.fft.fft2(nearplane_pad)
+    # Replace the amplitude with the measured amplitude.
+    farplane = (np.sqrt(data) * (farplane.real + 1j * farplane.imag)
+                / np.sqrt(farplane.imag * farplane.imag
+                          + farplane.real * farplane.real))
+
+    lag1 = 0.5 * np.sum(np.power(np.abs(np.abs(farplane)-data), 2)) + np.sum(np.real(np.multiply(np.conjugate(lamda), (psi - reg) )) ) + (rho / 2) * np.power(np.linalg.norm(psi - reg, ord=2),2)    
+    return lag1
+
+def bisec_wolfe(basepnt, srchdirec, gradcurr, data, probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner):
+    (alpha, beta, step, c1, c2) = (0, 100, 1, 0.001, 0.9)
+    i = 0
+    max_iter = 50
+    stop_iter = 0
+    stop_val = basepnt
+    minima = 0  
+    fcurr = lagrangian(basepnt, data, probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner) 
+#    gamma = np.linspace(1e-5, 1, 1000)
+#    f_all = list()
+##    f_all.append(oldf)
+#    for k in range(gamma.size):
+#        newpnt = basepnt + gamma[k] * srchdirec
+#        newf = lagrangian(newpnt, data, probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner)
+#        f_all.append(newf)
+#    plt.figure()
+#    plt.plot(gamma, f_all )
+#    plt.xlabel('gamma values')
+#    plt.ylabel('Lagrangian')
+#    plt.savefig('Lag_min.png')
+    
+    
+    while i <= max_iter:
+        # first condition
+        rightf = fcurr + step * c1 * np.real( np.sum( np.multiply( np.conjugate(gradcurr) , srchdirec ) ) ) 
+        newpnt = basepnt + step * srchdirec
+        leftf = lagrangian(newpnt, data, probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner) 
+       
+        if leftf - rightf > 1e-5:
+            beta = step
+            step = .5*(alpha + beta)
+        elif np.real( np.sum( np.multiply( np.conjugate(gradlagrangian(newpnt, data,probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner) ) , srchdirec ) ) ) < c2 * np.real( np.sum( np.multiply( np.conjugate(gradcurr) , srchdirec ) ) ):             
+            alpha = step
+            if beta > 10:
+                step = 2*alpha
+            else:
+                step = .5*(alpha + beta)
+              
+        else: 
+            break
+        i += 1
+        stop_val = basepnt + step*srchdirec
+        stop_iter = i
+        minima = lagrangian(stop_val, data, probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner) 
+    #print(val, objectf)
+    
+    return step, stop_iter, stop_val, minima  
+
 
 def grad(data,
          probe, v, h,
@@ -354,6 +452,7 @@ def grad(data,
     probe_inverse = np.conj(probe) / np.max(np.square(np.abs(np.conj(probe))))
     wavefront_shape = [h.size, probe.shape[0], probe.shape[1]]
     convpsi = np.zeros(priter, dtype='float32')
+   
     for i in range(priter):
         # combine all wavefronts into one array
         wavefronts = uncombine_grids(grids_shape=wavefront_shape, v=v, h=h,
@@ -378,16 +477,19 @@ def grad(data,
         upd_psi = combine_grids(grids=upd_m, v=v, h=h,
                                 combined_shape=psi.shape,
                                 combined_corner=psi_corner)
+        #line search for gamma    
+        gradcurr = (0.5 * upd_psi + rho * psi - rho * reg + lamda).copy()
+        gamma, miter, stop_val, minima = bisec_wolfe(psi, -gradcurr, gradcurr, data, probe, npadv, npadh, v, h, reg, lamda, rho, psi_corner) 
         # Update psi
+        new_psi = psi - gradcurr
+        
         new_psi = ((1 - gamma * rho) * psi
                + gamma * (reg * rho - lamda)
                - (gamma / 2) * upd_psi)
         convpsi[i] = np.sqrt(np.sum(np.power(np.abs(new_psi - psi), 2)))
         psi = new_psi.copy()       
         
-    dualres3 = np.sqrt(np.sum(np.power(np.abs(0.5 * upd_psi + lamda), 2)))
-        
-    return new_psi, convpsi, dualres3
+    return new_psi, convpsi, upd_psi
 
 
 def exitwave(probe, v, h, psi, psi_corner=None):
@@ -452,7 +554,7 @@ def reconstruct(data,
     #   have a standard interface. Perhaps pass unique params to a generic
     #   struct or array.
     if algorithm is "grad":
-        new_psi, convpsi, dualres3 = grad(data=data,
+        new_psi, convpsi, upd_psi = grad(data=data,
                        probe=probe, v=v, h=h,
                        psi=psi, psi_corner=psi_corner,
                        priter=priter, **kwargs
@@ -460,4 +562,4 @@ def reconstruct(data,
     else:
         raise ValueError("The {} algorithm is not an available.".format(
             algorithm))
-    return new_psi, convpsi, dualres3
+    return new_psi, convpsi, upd_psi
